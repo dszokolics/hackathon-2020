@@ -26,14 +26,14 @@ add_post_popularity <- function(ABT_in, data_in, abt_date){
     ungroup() %>%
     filter(max_post == time) %>%
     group_by(by) %>%
-    summarise(last_score = max(score),
-              last_desc = max(descendants),
+    summarise(last_post_score = max(score),
+              last_post_desc = max(descendants),
               days_from_last_post = as.Date(abt_date) - max(max_post)) %>%
     ungroup()
   
   ABT <- ABT %>%
-    left_join(last_post %>% select(by, last_score, last_desc, days_from_last_post)) %>%
-    replace_na(list("last_score" = 0, "last_desc" = 0, "days_from_last_post" = 183))
+    left_join(last_post %>% select(by, last_post_score, last_post_desc, days_from_last_post)) %>%
+    replace_na(list("last_post_score" = 0, "last_post_desc" = 0, "days_from_last_post" = 183))
   
   popularity_30 <- data %>%
     filter(as.Date(abt_date) - time < 30) %>%
