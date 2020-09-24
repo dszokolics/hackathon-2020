@@ -13,7 +13,7 @@ add_last_activity <- function(ABT_in, data_in, abt_date) {
   ABT <- ABT_in %>% filter(year_month == abt_date)
   
   data <- data_in %>%
-    mutate(time = as.Date(as.POSIXct(time, origin="1970-01-01"))) %>%
+    mutate(time = as.Date(time)) %>%
     filter(time < abt_date, by %in% ABT$by) %>%
     group_by(by) %>%
     summarise(last_activity = max(time)) %>%

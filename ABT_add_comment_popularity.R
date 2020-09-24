@@ -13,7 +13,7 @@ add_comment_popularity <- function(ABT_in, data_in, abt_date){
   ABT <- ABT_in %>% filter(year_month == abt_date)
   
   data <- data_in %>%
-    mutate(time = as.Date(as.POSIXct(time, origin="1970-01-01"))) %>%
+    mutate(time = as.Date(time)) %>%
     filter(time < as.Date(abt_date),
            time > as.Date(abt_date) - as.difftime(183, unit="days"),
            by %in% ABT$by, type == "comment") %>%

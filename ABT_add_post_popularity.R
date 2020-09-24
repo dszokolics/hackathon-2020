@@ -13,12 +13,14 @@ add_post_popularity <- function(ABT_in, data_in, abt_date){
   ABT <- ABT_in %>% filter(year_month == abt_date)
   
   data <- data_in %>%
-    mutate(time = as.Date(as.POSIXct(time, origin="1970-01-01"))) %>%
+    mutate(time = as.Date(time)) %>%
     filter(time < as.Date(abt_date),
            time > as.Date(abt_date) - as.difftime(183, unit="days"),
            by %in% ABT$by, type == "story") %>%
     select(by, descendants, score, time) %>%
     replace_na(list("score" = 0, "descendants" = 0))
+  
+  print(dim(data))
   
   last_post <- data %>%
     group_by(by) %>%
