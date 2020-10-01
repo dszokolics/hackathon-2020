@@ -35,7 +35,6 @@ comments_recent <- comments_all[comments_all$type == "comment", ]
 # Data Cleanings  #
 ###################
 
-
 # create date field
 comments_recent$time <- as.Date(as.POSIXct(comments_recent$time, origin="1970-01-01"))
 comments_recent$time <- floor_date(as_date(comments_recent$time), "month")
@@ -43,6 +42,7 @@ comments_recent$time <- floor_date(as_date(comments_recent$time), "month")
 comments_recent <- comments_recent[comments_recent$time > "2019-08-01", ]
 str(comments_recent)
 # length: 2909608
+
 
 ###########################
 # cleaning comment field  #
@@ -87,18 +87,23 @@ comments_recent$text <- gsub("[^[:alnum:] ]", " ", comments_recent$text)
 # drop numerical characters
 comments_recent$text <- gsub("[0-9]", " ", comments_recent$text)
 
+comments_recent$text <- gsub("â€™", "'", comments_recent$text)
+
 # filter empty texts after regex
 comments_recent <- comments_recent[comments_recent$text != "", ]
 
-comments_recent$text <- gsub("â€™", "'", comments_recent$text)
 
+###########################################
+# Sentiment analysis on the whole comment #
+###########################################
 
 # drop character after '
 # before drop it run sentiment R sentiment analysis,
 # on sentences:
-comments1$sentiment <- sentiment(comments1$text)$sentiment[1:1000]
+comments1$sentiment <- sentiment(comments1$text)$sentiment
 
 comments_recent$text <- gsub("'.*? ", " ", comments_recent$text)
+
 
 #################
 # Starting NLP  #
@@ -125,8 +130,26 @@ comments_tokenized <- comments_tokenized %>%
 
 comments_tokenized <- comments_tokenized[!duplicated(comments_tokenized), ]
 
+#################################
+# Further feature engineering   #
+#################################
+
+# length of a comment (just tokens without stopwords)
 comments_tokenized$token_cnt <- str_count(comments_tokenized$text, '\\w+')
 
+
+# create sophisticated index:
+sop <- c()
+for (i in 1:nrow(comments_tokenized)){
+  sop <- c(sop, length(unique(unlist(str_split(comments_tokenized$text[i], ' ')))) / length(unlist(str_split(comments_tokenized$text[i], ' '))))
+}
+
+comments_tokenized$sophis_index <- sop
+
+
+###################################
+# Group the data like ABT format  #
+###################################
 
 ABT_comment <- comments_tokenized %>% 
   group_by(by, time) %>% 
@@ -142,6 +165,9 @@ saveRDS(ABT_comment, 'G:/Saját meghajtó/HiFly/Common/Homokozó/nlp-hackathon/data
 
 
 
+###############################################################
+# Remaining data process when runnig this on the whole ABT    #
+###############################################################
 
 """
 comments_recent1 <- comments_recent[1:1000000, ]
@@ -179,10 +205,69 @@ comment_tokenized2 <- readRDS('G:/Saját meghajtó/HiFly/Common/Homokozó/nlp-hacka
 comment_tokenized3 <- readRDS('G:/Saját meghajtó/HiFly/Common/Homokozó/nlp-hackathon/data/transformed/comment_tokenized3.rds')
 
 df <- rbind(comment_tokenized1, comment_tokenized2, comment_tokenized3)
-
-
-
-
 """
+
+###################################
+#               LDA               #
+# (not used because the huge ABT) #
+###################################
+
+
+# LDA on tokenized tibble:
+# include only words that occur at least 50 times
+set.seed(123)
+word_sci_comment <- comments_tokenized %>%
+  group_by(id, time, word) %>%
+  summarize(word_total = n()) %>%
+  group_by(id, time) %>%
+  mutate(n = sum(word_total)) %>%
+  ungroup() %>%
+  filter(n > 20) %>%
+  sample_n(5000)
+
+ggplot(word_sci_comment, aes(x=n)) + geom_histogram(binwidth = 5)
+
+
+
+# convert into a document-term matrix
+dtm <- word_sci_comment %>%
+  cast_dtm(id, word, word_total)
+
+lda <- LDA(dtm, k = 7, control = list(seed= 1234))
+
+str(lda)
+
+lda@gamma
+
+# add LDA flag to tibble
+chapter_topics <- tidy(lda, matrix = "gamma")
+
+chapter_topics %>% 
+  arrange(document, gamma) %>% View()
+
+
+mean(chapter_topics$gamma)
+
+
+comments_recent <- comments_recent %>% 
+  left_join(chapter_classifications, by=c('id'='document'))
+
+
+
+# visualize LDA
+top_terms <- chapter_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  scale_x_reordered()
+
 
 
